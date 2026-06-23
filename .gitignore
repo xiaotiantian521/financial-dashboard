@@ -4,3 +4,6 @@ __pycache__/
 venv/
 .env
 take_screenshots.py
+screenshot_industry.py
+temp_screenshot.png
+财务仪表板.xlsx
