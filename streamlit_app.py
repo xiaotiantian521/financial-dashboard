@@ -393,7 +393,7 @@ elif page == "🏢 同行业对比":
     if os.path.exists(csv_path):
         ind_df = pd.read_csv(csv_path, encoding='utf-8-sig')
         # Only show years available in both datasets
-        ind_years = set(ind_df['报告期'].unique())
+        ind_years = set(str(y) for y in ind_df['报告期'].unique())
         our_years = set(YEARS)
         years_avail = sorted(ind_years & our_years, reverse=True)
         if not years_avail:
