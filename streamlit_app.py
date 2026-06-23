@@ -366,50 +366,143 @@ elif page == "🏢 同行业对比":
     st.markdown("## 🏢 同行业对比分析")
     st.markdown("对标公司：艾融软件(830799)、用友网络(600588)、华宇软件(300271)、三维天地(301159)、山大地纬(688579)、殷图网联(835508)、天亿马(301178)、远光软件(002063)、宇信科技(300674)")
 
-    st.warning("""
-    ⚠️ **行业数据获取说明**
-    
-    同行业数据可通过以下方式接入：
-    1. **AkShare 自动获取**：运行 `industry_data_fetcher.py` 脚本，自动拉取9家上市公司年报数据
-    2. **手动导入**：通过下方「数据管理」页面上传行业数据Excel
-    3. **API 实时接入**：配置 Wind/Choice 终端数据接口
-    
-    目前展示为小甜甜公司的指标，待接入行业数据后自动对比。
-    """)
+    # ─── Parse Chinese number strings ───
+    def parse_cn(val):
+        if pd.isna(val) or val is None or val == 'False':
+            return None
+        s = str(val).replace(',', '').strip()
+        neg = 1
+        if s.startswith('-'):
+            neg = -1
+            s = s[1:]
+        if '亿' in s:
+            num = float(s.replace('亿', ''))
+            return neg * num * 10000  # 亿 → 万
+        if '万' in s:
+            num = float(s.replace('万', ''))
+            return neg * num
+        if '%' in s:
+            return neg * float(s.replace('%', ''))
+        try:
+            return neg * float(s)
+        except:
+            return None
 
-    # Prepare template
-    peers = ['艾融软件', '用友网络', '华宇软件', '三维天地', '山大地纬', '殷图网联', '天亿马', '远光软件', '宇信科技']
-    metrics = ['营业收入(亿)', '毛利率(%)', '净利率(%)', '研发费用率(%)']
+    # ─── Load industry data ───
+    csv_path = os.path.join(os.path.dirname(__file__), 'industry_data.csv')
+    if os.path.exists(csv_path):
+        ind_df = pd.read_csv(csv_path, encoding='utf-8-sig')
+        # Only show years available in both datasets
+        ind_years = set(ind_df['报告期'].unique())
+        our_years = set(YEARS)
+        years_avail = sorted(ind_years & our_years, reverse=True)
+        if not years_avail:
+            st.warning("行业数据年份与本公司数据年份不匹配，请更新数据。")
+        else:
+            sel_year = st.selectbox("选择对比年份", years_avail, index=0)
 
-    # Show our company as baseline
-    our_data = {
-        '营业收入(亿)': round(yearly['营业收入']['2025'] / 10000, 2),
-        '毛利率(%)': yearly['毛利率']['2025'],
-        '净利率(%)': yearly['净利率']['2025'],
-        '研发费用率(%)': round(yearly['研发费用']['2025'] / yearly['营业收入']['2025'] * 100, 1)
-    }
+            radar_metrics = ['销售毛利率', '销售净利率', '净资产收益率']
+            radar_labels = ['毛利率(%)', '净利率(%)', '净资产收益率(%)']
 
-    df_compare = pd.DataFrame({'指标': metrics, '小甜甜公司(2025)': [our_data[m] for m in metrics]})
-    df_compare = df_compare.set_index('指标')
-    st.dataframe(df_compare, use_container_width=True)
+            # Build comparison data
+            peer_rows = []
+            for _, r in ind_df[ind_df['报告期'] == sel_year].iterrows():
+                peer_rows.append({
+                    '公司': r['公司'],
+                    '营业收入(万元)': parse_cn(r['营业总收入']),
+                    '净利润(万元)': parse_cn(r['净利润']),
+                    '毛利率(%)': parse_cn(r['销售毛利率']),
+                    '净利率(%)': parse_cn(r['销售净利率']),
+                    '净资产收益率(%)': parse_cn(r['净资产收益率']),
+                })
 
-    # Radar chart placeholder
-    fig = go.Figure()
-    fig.add_trace(go.Scatterpolar(r=[our_data[m] for m in metrics] + [our_data[metrics[0]]],
-                                  theta=metrics + [metrics[0]],
-                                  fill='toself', name='小甜甜公司',
-                                  line=dict(color='#00d4ff', width=2)))
-    fig.update_layout(polar=dict(radialaxis=dict(visible=True, gridcolor='#1e3a5f')),
-                     title='小甜甜公司经营指标雷达图', height=400, template='plotly_dark',
-                     margin=dict(l=80, r=80, t=40, b=40))
-    st.plotly_chart(fig, use_container_width=True)
+            # Add 小甜甜
+            rev_tt = yearly['营业收入'][sel_year]
+            cost_tt = yearly['营业成本'][sel_year]
+            profit_tt = yearly['利润总额'][sel_year]
+            gross_margin_tt = (rev_tt - cost_tt) / rev_tt * 100 if rev_tt else 0
+            net_margin_tt = profit_tt / rev_tt * 100 if rev_tt else 0
+            # Approximate ROE using net profit / (equity approximated by total assets - total liabilities)
+            total_cost = sum(yearly.get(k, {}).get(sel_year, 0) for k in ['营业成本','税金及附加','销售费用','管理费用','研发费用','财务费用'])
+            equity_approx = rev_tt - total_cost + yearly['其他收益'].get(sel_year, 0)
+            roe_tt = profit_tt / equity_approx * 100 if equity_approx else 0
 
-    st.markdown("**行业数据获取脚本（AkShare）**")
-    st.code("""
-# industry_data_fetcher.py - 待生成
-# 使用方法: python industry_data_fetcher.py
-# 功能: 自动获取9家上市公司年报财务数据，输出行业对比CSV
-    """, language='python')
+            peer_rows.append({
+                '公司': '✨ 小甜甜公司',
+                '营业收入(万元)': rev_tt,
+                '净利润(万元)': profit_tt,
+                '毛利率(%)': round(gross_margin_tt, 2),
+                '净利率(%)': round(net_margin_tt, 2),
+                '净资产收益率(%)': round(abs(roe_tt), 2),
+            })
+
+            df_all = pd.DataFrame(peer_rows).set_index('公司')
+
+            # ─── Comparison table ───
+            display_cols = ['营业收入(万元)', '净利润(万元)', '毛利率(%)', '净利率(%)', '净资产收益率(%)']
+            st.dataframe(df_all[display_cols].style.format({
+                '营业收入(万元)': '{:,.0f}',
+                '净利润(万元)': '{:,.0f}',
+                '毛利率(%)': '{:.1f}',
+                '净利率(%)': '{:.1f}',
+                '净资产收益率(%)': '{:.1f}',
+            }), use_container_width=True)
+
+            # ─── Radar chart ───
+            fig = go.Figure()
+            colors = ['#00d4ff','#ff6b6b','#ffd93d','#6bcbff','#c084fc','#a8e6cf','#ff9ff3','#54a0ff','#5f27cd','#ff9f43']
+            for i, (name, row) in enumerate(df_all.iterrows()):
+                vals = [row[m] for m in radar_metrics]
+                fig.add_trace(go.Scatterpolar(r=vals + [vals[0]], theta=radar_labels + [radar_labels[0]],
+                               fill='toself', name=name,
+                               line=dict(color=colors[i % len(colors)], width=2 if '小甜甜' in str(name) else 1.5)))
+
+            fig.update_layout(polar=dict(radialaxis=dict(visible=True, gridcolor='#1e3a5f', range=[-80, 80])),
+                             title=f'{sel_year}年 同行业经营指标雷达图', height=500, template='plotly_dark',
+                             margin=dict(l=80, r=80, t=40, b=40),
+                             legend=dict(orientation='h', yanchor='bottom', y=-0.2, xanchor='center', x=0.5))
+            st.plotly_chart(fig, use_container_width=True)
+
+            # ─── Bar chart: 毛利率 & 净利率 ───
+            fig = go.Figure()
+            df_sorted = df_all.sort_values('毛利率(%)', ascending=True)
+            fig.add_trace(go.Bar(name='毛利率(%)', y=df_sorted.index, x=df_sorted['毛利率(%)'],
+                                 orientation='h', marker_color='#00d4ff',
+                                 text=df_sorted['毛利率(%)'].apply(lambda v: f'{v:.1f}%'), textposition='outside'))
+            fig.add_trace(go.Bar(name='净利率(%)', y=df_sorted.index, x=df_sorted['净利率(%)'],
+                                 orientation='h', marker_color='#ffd93d',
+                                 text=df_sorted['净利率(%)'].apply(lambda v: f'{v:.1f}%'), textposition='outside'))
+            fig.update_layout(title=f'{sel_year}年 毛利率 & 净利率排名', height=450, template='plotly_dark',
+                             barmode='group', margin=dict(l=120, r=60, t=40, b=30),
+                             xaxis=dict(gridcolor='#1e3a5f'))
+            st.plotly_chart(fig, use_container_width=True)
+
+            # ─── Revenue bar ───
+            fig = go.Figure()
+            df_rev = df_all.sort_values('营业收入(万元)', ascending=True)
+            colors_rev = ['#00d4ff'] * len(df_rev)
+            tt_name = '✨ 小甜甜公司'
+            if tt_name in df_rev.index:
+                tt_pos = list(df_rev.index).index(tt_name)
+                colors_rev[tt_pos] = '#ff6b6b'
+            fig.add_trace(go.Bar(y=df_rev.index, x=df_rev['营业收入(万元)'], orientation='h',
+                                 marker_color=colors_rev,
+                                 text=df_rev['营业收入(万元)'].apply(lambda v: f'{v/10000:.2f}亿' if v>=10000 else f'{v:.0f}万'),
+                                 textposition='outside'))
+            fig.update_layout(title=f'{sel_year}年 营业收入对比', height=450, template='plotly_dark',
+                             margin=dict(l=120, r=80, t=40, b=30),
+                             xaxis=dict(gridcolor='#1e3a5f'))
+            st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.warning("""
+        ⚠️ 行业数据未找到，请先运行数据抓取脚本：
+
+        ```bash
+        python industry_data_fetcher.py
+        ```
+
+        该脚本会自动获取9家上市公司年报数据并保存到 `industry_data.csv`。
+        """)
 
 # ===================== DATA MANAGEMENT =====================
 elif page == "📁 数据管理":

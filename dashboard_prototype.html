@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>小甜甜公司经营分析仪表板</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Microsoft YaHei', -apple-system, sans-serif; background: #0f1923; color: #e0e6ed; padding: 20px; }
+.header { text-align: center; padding: 20px 0; border-bottom: 1px solid #1e3a5f; margin-bottom: 24px; }
+.header h1 { font-size: 28px; font-weight: 700; background: linear-gradient(135deg, #00d4ff, #0099ff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.header p { color: #8899aa; margin-top: 6px; font-size: 14px; }
+.header p span { color: #00d4ff; }
+.kpi-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; margin-bottom: 24px; }
+.kpi-card { background: linear-gradient(135deg, #1a2a3a, #0f1923); border: 1px solid #1e3a5f; border-radius: 12px; padding: 16px; text-align: center; }
+.kpi-card .label { font-size: 12px; color: #8899aa; margin-bottom: 6px; }
+.kpi-card .value { font-size: 22px; font-weight: 700; }
+.kpi-card .sub { font-size: 11px; margin-top: 4px; }
+.kpi-card .up { color: #00c853; }
+.kpi-card .down { color: #ff5252; }
+.chart-row { display: grid; gap: 14px; margin-bottom: 14px; }
+.chart-row-2 { grid-template-columns: 1fr 1fr; }
+.chart-row-3 { grid-template-columns: 1fr 1fr 1fr; }
+.chart-row-full { grid-template-columns: 1fr; }
+.chart-box { background: linear-gradient(135deg, #1a2a3a, #0f1923); border: 1px solid #1e3a5f; border-radius: 12px; padding: 16px; }
+.chart-box h3 { font-size: 14px; color: #8899aa; margin-bottom: 12px; font-weight: 400; }
+.chart { width: 100%; height: 300px; }
+.chart-sm { height: 240px; }
+.chart-lg { height: 380px; }
+.footer { text-align: center; padding: 20px; color: #556677; font-size: 12px; border-top: 1px solid #1e3a5f; margin-top: 24px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+<h1>小甜甜有限公司 · 经营分析仪表板</h1>
+<p>数据期间：2023-2025 | 更新频率：月度 | 单位：<span>万元</span></p>
+</div>
+
+<div class="kpi-grid" id="kpiGrid"></div>
+
+<div class="chart-row chart-row-2">
+<div class="chart-box"><h3>📈 营业收入趋势（月度）</h3><div class="chart chart-lg" id="chartRevenue"></div></div>
+<div class="chart-box"><h3>💰 利润趋势（月度）</h3><div class="chart chart-lg" id="chartProfit"></div></div>
+</div>
+
+<div class="chart-row chart-row-2">
+<div class="chart-box"><h3>📊 成本费用结构（堆叠）</h3><div class="chart chart-lg" id="chartCost"></div></div>
+<div class="chart-box"><h3>🥧 费用构成占比（2025年）</h3><div class="chart chart-lg" id="chartExpensePie"></div></div>
+</div>
+
+<div class="chart-row chart-row-2">
+<div class="chart-box"><h3>📉 利润率趋势</h3><div class="chart chart-sm" id="chartMargin"></div></div>
+<div class="chart-box"><h3>🏆 年度核心指标对比</h3><div class="chart chart-sm" id="chartAnnual"></div></div>
+</div>
+
+<div class="chart-row chart-row-3">
+<div class="chart-box"><h3>📦 营业成本趋势</h3><div class="chart chart-sm" id="chartCostTrend"></div></div>
+<div class="chart-box"><h3>🔬 研发费用趋势</h3><div class="chart chart-sm" id="chartRd"></div></div>
+<div class="chart-box"><h3>📋 期间费用趋势</h3><div class="chart chart-sm" id="chartPeriodExpense"></div></div>
+</div>
+
+<div class="footer">
+数据来源：小甜甜有限公司利润表 | 原型版本 v1.0 | Power BI 设计蓝图
+</div>
+
+<script>
+// ===== DATA =====
+const YEARS = ['2023','2024','2025'];
+const MONTHS = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+
+const yearlyData = {
+  revenue: { '2023': 12968.82, '2024': 10284.29, '2025': 17181.37 },
+  cost: { '2023': 7879.18, '2024': 5659.89, '2025': 10256.70 },
+  tax: { '2023': 111.73, '2024': 128.21, '2025': 163.92 },
+  sellExp: { '2023': 1178.60, '2024': 1266.94, '2025': 1324.37 },
+  adminExp: { '2023': 1134.26, '2024': 1570.72, '2025': 1267.12 },
+  rdExp: { '2023': 2240.88, '2024': 2129.13, '2025': 2521.56 },
+  finExp: { '2023': 23.23, '2024': 22.17, '2025': 25.46 },
+  otherIncome: { '2023': 564.06, '2024': 488.05, '2025': 633.40 },
+  opProfit: { '2023': 964.99, '2024': -4.72, '2025': 2255.65 },
+  totalProfit: { '2023': 965.23, '2024': -11.28, '2025': 2164.08 },
+  grossMargin: { '2023': 39.25, '2024': 44.97, '2025': 40.30 },
+  netMargin: { '2023': 7.44, '2024': -0.11, '2025': 12.60 },
+  opMargin: { '2023': 7.44, '2024': -0.05, '2025': 13.13 }
+};
+
+const monthlyRevenue = {
+  '2023': [253.09, 446.68, 775.09, 648.24, 1786.23, 1755.81, 357.95, 436.83, 1345.30, 858.29, 779.26, 3526.04],
+  '2024': [587.21, 168.75, 1000.22, 520.51, 810.84, 905.44, 360.81, 658.94, 891.90, 560.09, 1278.37, 2541.21],
+  '2025': [215.08, 395.76, 755.70, 1306.49, 532.65, 987.88, 911.27, 513.13, 1537.02, 994.58, 2685.46, 6346.35]
+};
+
+const monthlyOpProfit = {
+  '2023': [-184.76, -182.31, -66.45, -6.14, 396.49, 521.57, -274.75, -151.02, 200.49, 6.27, -2.11, 707.69],
+  '2024': [-5.13, -322.35, 61.02, -31.14, 37.94, -84.44, -106.42, 123.10, 124.17, -201.09, -74.88, 474.50],
+  '2025': [-221.21, -276.23, 120.10, 361.88, -153.96, 22.58, 20.49, 116.69, 30.83, 194.62, 287.08, 1752.78]
+};
+
+const monthlyTotalProfit = {
+  '2023': [-184.76, -182.31, -66.45, -6.14, 396.49, 521.57, -274.75, -151.02, 200.49, 6.27, -2.07, 707.89],
+  '2024': [-5.09, -322.35, 61.02, -33.10, 37.94, -84.44, -106.42, 123.10, 124.07, -201.09, -74.95, 470.03],
+  '2025': [-221.21, -276.16, 120.14, 361.85, -154.01, 22.58, -22.92, 116.69, 30.83, 194.62, 286.60, 1705.07]
+};
+
+const monthlyCost = {
+  '2023': [154.14, 229.57, 507.67, 377.35, 970.49, 733.56, 316.10, 303.49, 812.93, 434.55, 608.08, 2431.25],
+  '2024': [273.74, 50.63, 584.77, 252.38, 495.51, 620.96, 147.71, 239.55, 468.93, 164.63, 824.68, 1536.40],
+  '2025': [123.78, 219.18, 238.93, 657.76, 224.38, 622.11, 527.72, 132.41, 954.45, 523.71, 1707.95, 4324.33]
+};
+
+const monthlySellExp = {
+  '2023': [119.98, 56.93, 57.21, 76.94, 62.80, 68.80, 78.66, 91.39, 87.07, 232.68, 103.05, 143.10],
+  '2024': [119.49, 81.30, 106.68, 78.05, 71.51, 134.31, 74.14, 65.92, 71.28, 198.91, 121.00, 144.36],
+  '2025': [95.77, 86.23, 130.61, 64.13, 96.78, 83.39, 81.12, 67.32, 167.72, 120.02, 207.60, 123.68]
+};
+
+const monthlyAdminExp = {
+  '2023': [84.02, 118.24, 98.96, 71.55, 104.13, 89.04, 95.33, 72.86, 99.20, 71.05, 80.79, 149.08],
+  '2024': [93.91, 167.33, 118.77, 111.85, 93.92, 113.83, 113.12, 91.12, 137.53, 117.68, 120.53, 291.14],
+  '2025': [91.73, 119.49, 125.10, 84.25, 166.28, 88.19, 62.01, 62.53, 195.66, 92.67, 89.36, 89.86]
+};
+
+const monthlyRdExp = {
+  '2023': [156.30, 230.42, 171.57, 165.37, 293.52, 333.64, 218.27, 181.21, 177.96, 98.45, 95.77, 118.39],
+  '2024': [165.45, 181.97, 178.42, 121.00, 141.86, 139.84, 193.07, 161.07, 110.42, 271.13, 276.01, 188.89],
+  '2025': [264.18, 254.03, 170.89, 155.69, 204.84, 242.53, 228.55, 169.34, 202.98, 122.15, 388.43, 117.94]
+};
+
+const monthlyFinExp = {
+  '2023': [4.12, -0.28, 4.29, 1.23, 1.13, 0.88, 1.36, 3.51, -0.10, 1.07, 2.48, 3.54],
+  '2024': [1.28, 0.90, 1.43, 0.73, 0.96, 5.20, 1.03, 2.53, 2.62, 0.91, 0.82, 3.77],
+  '2025': [0.80, 1.03, 5.90, 0.93, 0.93, 4.89, 0.55, 2.76, 2.13, 0.58, 0.52, 4.45]
+};
+
+// ===== KPI CARDS =====
+const kpis = [
+  { label: '营业收入 (2025)', value: '17,181', unit: '万元', change: '+67.1%', up: true },
+  { label: '营业利润 (2025)', value: '2,256', unit: '万元', change: '扭亏为盈', up: true },
+  { label: '利润总额 (2025)', value: '2,164', unit: '万元', change: '扭亏为盈', up: true },
+  { label: '毛利率 (2025)', value: '40.3%', unit: '', change: '-4.7pp', up: false },
+  { label: '净利率 (2025)', value: '12.6%', unit: '', change: '+12.7pp', up: true },
+  { label: '研发费用占比', value: '14.7%', unit: '', change: '-5.1pp', up: false }
+];
+
+const kpiGrid = document.getElementById('kpiGrid');
+kpis.forEach(k => {
+  const card = document.createElement('div');
+  card.className = 'kpi-card';
+  card.innerHTML = `
+    <div class="label">${k.label}</div>
+    <div class="value">${k.value}</div>
+    <div class="sub ${k.up ? 'up' : 'down'}">${k.change} ${k.unit}</div>
+  `;
+  kpiGrid.appendChild(card);
+});
+
+// ===== CHARTS =====
+const months = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+
+function makeOption(series, opts = {}) {
+  const colors = ['#00d4ff', '#ff6b6b', '#ffd93d'];
+  return {
+    tooltip: { trigger: 'axis', backgroundColor: 'rgba(26,42,58,0.9)', borderColor: '#1e3a5f', textStyle: { color: '#e0e6ed' } },
+    legend: { data: Object.keys(series), textStyle: { color: '#8899aa' }, top: 0 },
+    grid: { left: 50, right: 20, top: opts.noLegend ? 20 : 40, bottom: 30 },
+    xAxis: { type: 'category', data: months, axisLabel: { color: '#8899aa' }, axisLine: { lineStyle: { color: '#1e3a5f' } } },
+    yAxis: { type: 'value', axisLabel: { color: '#8899aa' }, splitLine: { lineStyle: { color: '#1a2a3a' } }, ...opts.yAxis },
+    series: Object.entries(series).map(([name, data], i) => ({
+      name, type: 'line', data, smooth: true, symbol: 'circle', symbolSize: 6,
+      lineStyle: { width: 2, color: colors[i] },
+      itemStyle: { color: colors[i] },
+      areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: colors[i] + '30' }, { offset: 1, color: colors[i] + '05' }] } }
+    }))
+  };
+}
+
+// 1. Revenue Trend
+echarts.init(document.getElementById('chartRevenue')).setOption(makeOption({
+  '2023年': monthlyRevenue['2023'],
+  '2024年': monthlyRevenue['2024'],
+  '2025年': monthlyRevenue['2025']
+}, { yAxis: { name: '万元' } }));
+
+// 2. Profit Trend
+echarts.init(document.getElementById('chartProfit')).setOption(makeOption({
+  '营业利润2023': monthlyOpProfit['2023'],
+  '营业利润2024': monthlyOpProfit['2024'],
+  '营业利润2025': monthlyOpProfit['2025']
+}, { yAxis: { name: '万元' } }));
+
+// 3. Cost Stacked Bar (2025)
+const cost2025 = monthlyCost['2025'];
+const sell2025 = monthlySellExp['2025'];
+const admin2025 = monthlyAdminExp['2025'];
+const rd2025 = monthlyRdExp['2025'];
+const fin2025 = monthlyFinExp['2025'];
+
+echarts.init(document.getElementById('chartCost')).setOption({
+  tooltip: { trigger: 'axis', backgroundColor: 'rgba(26,42,58,0.9)', borderColor: '#1e3a5f', textStyle: { color: '#e0e6ed' } },
+  legend: { data: ['营业成本','销售费用','管理费用','研发费用','财务费用'], textStyle: { color: '#8899aa' }, top: 0 },
+  grid: { left: 50, right: 20, top: 40, bottom: 30 },
+  xAxis: { type: 'category', data: months, axisLabel: { color: '#8899aa' }, axisLine: { lineStyle: { color: '#1e3a5f' } } },
+  yAxis: { type: 'value', name: '万元', axisLabel: { color: '#8899aa' }, splitLine: { lineStyle: { color: '#1a2a3a' } } },
+  series: [
+    { name: '营业成本', type: 'bar', stack: 'total', data: cost2025, itemStyle: { color: '#00d4ff' } },
+    { name: '销售费用', type: 'bar', stack: 'total', data: sell2025, itemStyle: { color: '#ff6b6b' } },
+    { name: '管理费用', type: 'bar', stack: 'total', data: admin2025, itemStyle: { color: '#ffd93d' } },
+    { name: '研发费用', type: 'bar', stack: 'total', data: rd2025, itemStyle: { color: '#6bcbff' } },
+    { name: '财务费用', type: 'bar', stack: 'total', data: fin2025, itemStyle: { color: '#c084fc' } }
+  ]
+});
+
+// 4. Expense Pie 2025
+const totalSell = sell2025.reduce((a,b)=>a+b,0);
+const totalAdmin = admin2025.reduce((a,b)=>a+b,0);
+const totalRd = rd2025.reduce((a,b)=>a+b,0);
+const totalFin = fin2025.reduce((a,b)=>a+b,0);
+const totalTax = yearlyData.tax['2025'];
+
+echarts.init(document.getElementById('chartExpensePie')).setOption({
+  tooltip: { trigger: 'item', formatter: '{b}: {c}万元 ({d}%)', backgroundColor: 'rgba(26,42,58,0.9)', borderColor: '#1e3a5f', textStyle: { color: '#e0e6ed' } },
+  series: [{
+    type: 'pie', radius: ['40%', '70%'], center: ['50%', '55%'],
+    label: { color: '#8899aa', formatter: '{b}\n{d}%' },
+    data: [
+      { value: Math.round(totalSell), name: '销售费用', itemStyle: { color: '#ff6b6b' } },
+      { value: Math.round(totalAdmin), name: '管理费用', itemStyle: { color: '#ffd93d' } },
+      { value: Math.round(totalRd), name: '研发费用', itemStyle: { color: '#6bcbff' } },
+      { value: Math.round(totalFin), name: '财务费用', itemStyle: { color: '#c084fc' } },
+      { value: Math.round(totalTax), name: '税金及附加', itemStyle: { color: '#a8e6cf' } }
+    ]
+  }]
+});
+
+// 5. Margin Trend
+echarts.init(document.getElementById('chartMargin')).setOption({
+  tooltip: { trigger: 'axis', backgroundColor: 'rgba(26,42,58,0.9)', borderColor: '#1e3a5f', textStyle: { color: '#e0e6ed' } },
+  legend: { data: ['毛利率','净利率','营业利润率'], textStyle: { color: '#8899aa' }, top: 0 },
+  grid: { left: 50, right: 20, top: 40, bottom: 30 },
+  xAxis: { type: 'category', data: YEARS, axisLabel: { color: '#8899aa' }, axisLine: { lineStyle: { color: '#1e3a5f' } } },
+  yAxis: { type: 'value', name: '%', axisLabel: { color: '#8899aa', formatter: '{value}%' }, splitLine: { lineStyle: { color: '#1a2a3a' } } },
+  series: [
+    { name: '毛利率', type: 'line', data: [39.25, 44.97, 40.30], smooth: true, symbol: 'diamond', symbolSize: 12,
+      lineStyle: { width: 3, color: '#00d4ff' }, itemStyle: { color: '#00d4ff' },
+      areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: '#00d4ff30' }, { offset: 1, color: '#00d4ff05' }] } } },
+    { name: '净利率', type: 'line', data: [7.44, -0.11, 12.60], smooth: true, symbol: 'circle', symbolSize: 10,
+      lineStyle: { width: 3, color: '#ffd93d' }, itemStyle: { color: '#ffd93d' } },
+    { name: '营业利润率', type: 'line', data: [7.44, -0.05, 13.13], smooth: true, symbol: 'rect', symbolSize: 10,
+      lineStyle: { width: 3, color: '#6bcbff' }, itemStyle: { color: '#6bcbff' } }
+  ]
+});
+
+// 6. Annual Bar Chart
+echarts.init(document.getElementById('chartAnnual')).setOption({
+  tooltip: { trigger: 'axis', backgroundColor: 'rgba(26,42,58,0.9)', borderColor: '#1e3a5f', textStyle: { color: '#e0e6ed' } },
+  legend: { data: ['营业收入','营业利润','利润总额'], textStyle: { color: '#8899aa' }, top: 0 },
+  grid: { left: 50, right: 20, top: 40, bottom: 30 },
+  xAxis: { type: 'category', data: YEARS, axisLabel: { color: '#8899aa' }, axisLine: { lineStyle: { color: '#1e3a5f' } } },
+  yAxis: { type: 'value', name: '万元', axisLabel: { color: '#8899aa' }, splitLine: { lineStyle: { color: '#1a2a3a' } } },
+  series: [
+    { name: '营业收入', type: 'bar', data: [12968.82, 10284.29, 17181.37], itemStyle: { color: '#00d4ff' }, barWidth: 20 },
+    { name: '营业利润', type: 'bar', data: [964.99, -4.72, 2255.65], itemStyle: { color: e => e.value < 0 ? '#ff5252' : '#ffd93d' }, barWidth: 20 },
+    { name: '利润总额', type: 'bar', data: [965.23, -11.28, 2164.08], itemStyle: { color: e => e.value < 0 ? '#ff5252' : '#6bcbff' }, barWidth: 20 }
+  ]
+});
+
+// 7. Cost Trend (line)
+echarts.init(document.getElementById('chartCostTrend')).setOption(makeOption({
+  '2023年': monthlyCost['2023'], '2024年': monthlyCost['2024'], '2025年': monthlyCost['2025']
+}, { noLegend: false, yAxis: { name: '万元' } }));
+
+// 8. R&D Trend
+echarts.init(document.getElementById('chartRd')).setOption(makeOption({
+  '2023年': monthlyRdExp['2023'], '2024年': monthlyRdExp['2024'], '2025年': monthlyRdExp['2025']
+}, { noLegend: false, yAxis: { name: '万元' } }));
+
+// 9. Period Expense Trend (Sell + Admin + Fin)
+const pe2023 = monthlySellExp['2023'].map((v,i) => v + monthlyAdminExp['2023'][i] + monthlyFinExp['2023'][i]);
+const pe2024 = monthlySellExp['2024'].map((v,i) => v + monthlyAdminExp['2024'][i] + monthlyFinExp['2024'][i]);
+const pe2025 = monthlySellExp['2025'].map((v,i) => v + monthlyAdminExp['2025'][i] + monthlyFinExp['2025'][i]);
+
+echarts.init(document.getElementById('chartPeriodExpense')).setOption(makeOption({
+  '2023年': pe2023.map(v=>Math.round(v*100)/100),
+  '2024年': pe2024.map(v=>Math.round(v*100)/100),
+  '2025年': pe2025.map(v=>Math.round(v*100)/100)
+}, { noLegend: false, yAxis: { name: '万元' } }));
+
+// Resize
+window.addEventListener('resize', () => {
+  document.querySelectorAll('.chart').forEach(el => {
+    const chart = echarts.getInstanceByDom(el);
+    if (chart) chart.resize();
+  });
+});
+</script>
+</body>
+</html>
