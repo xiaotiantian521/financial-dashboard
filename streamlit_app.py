@@ -401,20 +401,19 @@ elif page == "🏢 同行业对比":
         else:
             sel_year = st.selectbox("选择对比年份", years_avail, index=0)
 
-            radar_metrics = ['销售毛利率', '销售净利率', '净资产收益率']
-            radar_labels = ['毛利率(%)', '净利率(%)', '净资产收益率(%)']
+            radar_metrics = ['毛利率(%)', '净利率(%)', '净资产收益率(%)']
 
-            # Build comparison data
-            peer_rows = []
-            for _, r in ind_df[ind_df['报告期'] == sel_year].iterrows():
-                peer_rows.append({
-                    '公司': r['公司'],
-                    '营业收入(万元)': parse_cn(r['营业总收入']),
-                    '净利润(万元)': parse_cn(r['净利润']),
-                    '毛利率(%)': parse_cn(r['销售毛利率']),
-                    '净利率(%)': parse_cn(r['销售净利率']),
-                    '净资产收益率(%)': parse_cn(r['净资产收益率']),
-                })
+        # Build comparison data
+        peer_rows = []
+        for _, r in ind_df[ind_df['报告期'].astype(str) == sel_year].iterrows():
+            peer_rows.append({
+                '公司': r['公司'],
+                '营业收入(万元)': parse_cn(r['营业总收入']),
+                '净利润(万元)': parse_cn(r['净利润']),
+                '毛利率(%)': parse_cn(r['销售毛利率']),
+                '净利率(%)': parse_cn(r['销售净利率']),
+                '净资产收益率(%)': parse_cn(r['净资产收益率']),
+            })
 
             # Add 小甜甜
             rev_tt = yearly['营业收入'][sel_year]
@@ -453,7 +452,7 @@ elif page == "🏢 同行业对比":
             colors = ['#00d4ff','#ff6b6b','#ffd93d','#6bcbff','#c084fc','#a8e6cf','#ff9ff3','#54a0ff','#5f27cd','#ff9f43']
             for i, (name, row) in enumerate(df_all.iterrows()):
                 vals = [row[m] for m in radar_metrics]
-                fig.add_trace(go.Scatterpolar(r=vals + [vals[0]], theta=radar_labels + [radar_labels[0]],
+                fig.add_trace(go.Scatterpolar(r=vals + [vals[0]], theta=radar_metrics + [radar_metrics[0]],
                                fill='toself', name=name,
                                line=dict(color=colors[i % len(colors)], width=2 if '小甜甜' in str(name) else 1.5)))
 
