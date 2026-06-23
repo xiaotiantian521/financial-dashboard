@@ -26,65 +26,38 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ─── Data ───
+# ─── Data (from 附件0 利润表) ───
 YEARS = ['2023','2024','2025']
 MONTHS = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月']
 
-raw = {
-    '营业收入': {
-        '2023': [253.09,446.68,775.09,648.24,1786.23,1755.81,357.95,436.83,1345.30,858.29,779.26,3526.04],
-        '2024': [587.21,168.75,1000.22,520.51,810.84,905.44,360.81,658.94,891.90,560.09,1278.37,2541.21],
-        '2025': [215.08,395.76,755.70,1306.49,532.65,987.88,911.27,513.13,1537.02,994.58,2685.46,6346.35]
-    },
-    '营业成本': {
-        '2023': [154.14,229.57,507.67,377.35,970.49,733.56,316.10,303.49,812.93,434.55,608.08,2431.25],
-        '2024': [273.74,50.63,584.77,252.38,495.51,620.96,147.71,239.55,468.93,164.63,824.68,1536.40],
-        '2025': [123.78,219.18,238.93,657.76,224.38,622.11,527.72,132.41,954.45,523.71,1707.95,4324.33]
-    },
-    '销售费用': {
-        '2023': [119.98,56.93,57.21,76.94,62.80,68.80,78.66,91.39,87.07,232.68,103.05,143.10],
-        '2024': [119.49,81.30,106.68,78.05,71.51,134.31,74.14,65.92,71.28,198.91,121.00,144.36],
-        '2025': [95.77,86.23,130.61,64.13,96.78,83.39,81.12,67.32,167.72,120.02,207.60,123.68]
-    },
-    '管理费用': {
-        '2023': [84.02,118.24,98.96,71.55,104.13,89.04,95.33,72.86,99.20,71.05,80.79,149.08],
-        '2024': [93.91,167.33,118.77,111.85,93.92,113.83,113.12,91.12,137.53,117.68,120.53,291.14],
-        '2025': [91.73,119.49,125.10,84.25,166.28,88.19,62.01,62.53,195.66,92.67,89.36,89.86]
-    },
-    '研发费用': {
-        '2023': [156.30,230.42,171.57,165.37,293.52,333.64,218.27,181.21,177.96,98.45,95.77,118.39],
-        '2024': [165.45,181.97,178.42,121.00,141.86,139.84,193.07,161.07,110.42,271.13,276.01,188.89],
-        '2025': [264.18,254.03,170.89,155.69,204.84,242.53,228.55,169.34,202.98,122.15,388.43,117.94]
-    },
-    '财务费用': {
-        '2023': [4.12,-0.28,4.29,1.23,1.13,0.88,1.36,3.51,-0.10,1.07,2.48,3.54],
-        '2024': [1.28,0.90,1.43,0.73,0.96,5.20,1.03,2.53,2.62,0.91,0.82,3.77],
-        '2025': [0.80,1.03,5.90,0.93,0.93,4.89,0.55,2.76,2.13,0.58,0.52,4.45]
-    },
-    '税金及附加': {
-        '2023': [2.96,4.45,7.68,8.84,11.66,8.64,8.52,11.83,8.06,14.30,9.12,15.67],
-        '2024': [6.05,8.98,5.42,8.19,7.53,14.24,7.46,7.70,16.53,7.93,10.21,27.99],
-        '2025': [2.87,5.81,7.33,6.23,18.53,8.33,31.90,9.30,12.17,5.59,20.70,35.16]
-    },
-    '其他收益': {
-        '2023': [83.68,10.35,5.84,46.90,54.00,0.32,85.54,76.45,40.31,0.07,117.91,42.69],
-        '2024': [67.57,0,56.29,20.55,38.39,38.51,69.29,32.04,39.57,0,0,125.84],
-        '2025': [142.85,13.79,43.15,24.36,25.13,84.13,41.06,47.23,28.92,64.76,16.16,101.84]
-    }
-}
+SRC = os.path.join(os.path.dirname(__file__), '附件0-小甜甜公司数据.xlsx')
+pl = pd.read_excel(SRC, sheet_name='利润表', header=None)
 
-# Derived data
-def calc_monthly(item_name, fn):
-    result = {}
-    for y in YEARS:
-        result[y] = [fn(y, m) for m in range(12)]
-    return result
+items_src = [
+    (3,'营业收入'),(4,'营业成本'),(5,'税金及附加'),(6,'销售费用'),
+    (7,'管理费用'),(8,'研发费用'),(9,'财务费用'),(12,'其他收益'),
+    (18,'信用减值损失'),(21,'营业利润'),(22,'营业外收入'),(23,'营业外支出'),
+    (24,'利润总额'),(25,'所得税费用'),(26,'净利润'),
+]
+annual_col = {'2023':40,'2024':27,'2025':14}
+monthly_cols = {'2023':list(range(28,40)),'2024':list(range(15,27)),'2025':list(range(2,14))}
 
+raw = {}
+annual_actual = {}
+for src_row, name in items_src:
+    raw[name] = {}
+    annual_actual[name] = {}
+    row_data = pl.iloc[src_row]
+    for year in YEARS:
+        raw[name][year] = [round(row_data[c]/10000,2) if pd.notna(row_data[c]) else 0 for c in monthly_cols[year]]
+        v = row_data[annual_col[year]]
+        annual_actual[name][year] = round(v/10000) if pd.notna(v) else 0
+
+# Monthly profit viz (approximated — 利润表 has no monthly breakdown for profit items)
 monthly_op_profit = {}
 monthly_total_profit = {}
 for y in YEARS:
-    op_list = []
-    tp_list = []
+    op_list, tp_list = [], []
     for m in range(12):
         rev = raw['营业收入'][y][m]
         cost = raw['营业成本'][y][m]
@@ -94,26 +67,24 @@ for y in YEARS:
         rd = raw['研发费用'][y][m]
         fin = raw['财务费用'][y][m]
         other = raw['其他收益'][y][m]
-        op = rev - cost - tax - sell - admin - rd - fin + other
-        op_list.append(round(op, 2))
-        # For total profit we don't have 营业外收支 monthly, approximate
-        tp_list.append(round(op, 2))
+        impair = raw['信用减值损失'][y][m]
+        op = round(rev - cost - tax - sell - admin - rd - fin + other + impair, 2)
+        op_list.append(op)
+        tp_list.append(op + raw['营业外收入'][y][m] - raw['营业外支出'][y][m])
     monthly_op_profit[y] = op_list
-    monthly_total_profit[y] = tp_list
+    monthly_total_profit[y] = [round(v, 2) for v in tp_list]
 
-# Yearly totals
+# Yearly totals — use actual annual values from 利润表
 yearly = {}
-for item, data in raw.items():
-    yearly[item] = {y: round(sum(data[y]), 2) for y in YEARS}
-yearly['营业利润'] = {y: round(sum(monthly_op_profit[y]), 2) for y in YEARS}
-yearly['利润总额'] = {y: round(sum(monthly_total_profit[y]), 2) for y in YEARS}
+for item in raw:
+    yearly[item] = annual_actual[item].copy()
 
 # Margins
 for y in YEARS:
     rev = yearly['营业收入'][y]
     if rev:
         yearly.setdefault('毛利率', {})[y] = round((rev - yearly['营业成本'][y]) / rev * 100, 2)
-        yearly.setdefault('净利率', {})[y] = round(yearly['利润总额'][y] / rev * 100, 2)
+        yearly.setdefault('净利率', {})[y] = round(yearly['净利润'][y] / rev * 100, 2)
         yearly.setdefault('营业利润率', {})[y] = round(yearly['营业利润'][y] / rev * 100, 2)
 
 # ─── Helpers ───
@@ -418,7 +389,7 @@ elif page == "🏢 同行业对比":
             # Add 小甜甜
             rev_tt = yearly['营业收入'][sel_year]
             cost_tt = yearly['营业成本'][sel_year]
-            profit_tt = yearly['利润总额'][sel_year]
+            profit_tt = yearly['净利润'][sel_year]
             gross_margin_tt = (rev_tt - cost_tt) / rev_tt * 100 if rev_tt else 0
             net_margin_tt = profit_tt / rev_tt * 100 if rev_tt else 0
             # Approximate ROE using net profit / (equity approximated by total assets - total liabilities)
@@ -507,7 +478,7 @@ elif page == "🏢 同行业对比":
 elif page == "📁 数据管理":
     st.markdown("## 📁 数据管理")
 
-    tab1, tab2, tab3 = st.tabs(["📥 数据导入", "📤 数据导出", "📋 数据预览"])
+    tab1, tab2, tab3, tab4 = st.tabs(["📥 数据导入", "📤 数据导出", "📋 数据预览", "✅ 数据验证"])
 
     with tab1:
         st.markdown("### 上传自定义数据")
@@ -566,6 +537,46 @@ elif page == "📁 数据管理":
         df_current = pd.read_csv('profit_data_flat.csv', encoding='utf-8-sig')
         st.dataframe(df_current, use_container_width=True)
         st.caption(f"共 {len(df_current)} 条记录")
+
+    with tab4:
+        st.markdown("### ✅ 数据来源验证")
+        st.markdown(f"**源文件**: `附件0-小甜甜公司数据.xlsx` → **利润表** sheet")
+        st.markdown("所有年度数据直接从利润表读取，单位：万元")
+
+        # Source data table
+        src_items = ['营业收入','营业成本','税金及附加','销售费用','管理费用','研发费用','财务费用','其他收益','信用减值损失','营业利润','营业外收入','营业外支出','利润总额','所得税费用','净利润']
+        rows = []
+        for item in src_items:
+            rows.append({'利润表科目': item, **{y: annual_actual[item][y] for y in YEARS}})
+        df_src = pd.DataFrame(rows)
+        st.dataframe(df_src, use_container_width=True, hide_index=True)
+
+        # KPI derivation
+        st.markdown("### 📐 核心指标推导")
+        derivations = []
+        for y in YEARS:
+            r = annual_actual['营业收入'][y]
+            c = annual_actual['营业成本'][y]
+            op = annual_actual['营业利润'][y]
+            tp = annual_actual['利润总额'][y]
+            np = annual_actual['净利润'][y]
+            gm = f"{(r-c)/r*100:.1f}%" if r else "N/A"
+            nm = f"{np/r*100:.1f}%" if r else "N/A"
+            opr = f"{op/r*100:.1f}%" if r else "N/A"
+            derivations.append({'年份': y, '营业收入①': r, '营业成本②': c, '毛利=①-②': r-c, '毛利率=(①-②)/①': gm,
+                              '营业利润③': op, '净利润④': np, '净利率=④/①': nm, '营业利润率=③/①': opr})
+        df_der = pd.DataFrame(derivations)
+        st.dataframe(df_der, use_container_width=True, hide_index=True)
+        st.caption("注：毛利率、净利率、营业利润率均基于实际利润表数据计算")
+
+        # Quick sanity check
+        st.markdown("### 🔍 数据一致性检查")
+        rev_sum = sum(annual_actual['营业收入'][y] for y in YEARS)
+        cost_sum = sum(annual_actual['营业成本'][y] for y in YEARS)
+        col1, col2, col3 = st.columns(3)
+        with col1: st.metric("三年收入合计", f"{rev_sum}万")
+        with col2: st.metric("三年成本合计", f"{cost_sum}万")
+        with col3: st.metric("收入/成本比", f"{rev_sum/cost_sum:.2f}倍")
 
 # ─── Footer ───
 st.markdown("---")
